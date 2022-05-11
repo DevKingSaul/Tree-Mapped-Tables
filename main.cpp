@@ -16,6 +16,17 @@ void log(unsigned char *msg, int len, const char *label) {
   printf("\n");
 }
 
+void logChar(unsigned char *msg, int len, const char *label) {
+
+  printf("%s: ", label);
+
+  for(int i = 0; i < len; i++) {
+    printf("%c", msg[i]);
+  }
+  
+  printf("\n");
+}
+
 unsigned long long expandBit(int x, int y) {
     unsigned long long result = x;
     result <<= y;
@@ -35,7 +46,7 @@ unsigned long long getPointer(unsigned char *array, int offset) {
     return result;
 }
 
-void get(unsigned char *array, unsigned char *key) {
+unsigned char *get(unsigned char *array, unsigned char *key) {
     unsigned char *branch = (unsigned char*)(getPointer(array, 0));
     unsigned int level = 0;
     unsigned int branchSize = branch[0];
@@ -44,6 +55,7 @@ void get(unsigned char *array, unsigned char *key) {
     for (;;) {
         if (offset > branchSize) {
             printf("End (End of Branch)\n");
+            return NULL;
             break;
         }
         int ptrOffset = 1 + (offset * 9);
@@ -51,14 +63,22 @@ void get(unsigned char *array, unsigned char *key) {
             unsigned long long ptr = getPointer(branch, ptrOffset + 1);
             if (ptr == 0) {
                 printf("End (Pointer Invalid)\n");
+                return NULL;
                 break;
             } else {
                 printf("Found at Level %u\n", level);
-                level++;
-                branch = (unsigned char*)(ptr);
-                offset = 0;
-                branchSize = branch[0];
-                printf("New Branch Size: %u\n", branchSize);
+
+                if (level == 31) {
+                    printf("Found Value: %u\n", offset);
+                    return (unsigned char*)(ptr);
+                    break;
+                } else {
+                    level++;
+                    branch = (unsigned char*)(ptr);
+                    offset = 0;
+                    branchSize = branch[0];
+                    printf("New Branch Size: %u\n", branchSize);
+                }
             }
         } else {
             offset += 1;
@@ -178,10 +198,10 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
 }
 
 unsigned char TestKey[] = {0x9F, 0xE5, 0x8E, 0x1A, 0x6F, 0x99, 0xD1, 0xD8, 0x31, 0xB4, 0xFE, 0xDC, 0xF8, 0xDD, 0x3D, 0x9C, 0xE1, 0xAA, 0x5A, 0x44, 0x84, 0x3E, 0x97, 0x6B, 0x40, 0xF7, 0x6E, 0xE5, 0xB7, 0xDC, 0xCD, 0xD8};
-unsigned char TestValue[] = "Hello";
+unsigned char TestValue[] = "Hello v1";
 
 unsigned char TestKey2[] = {0x9F, 0xE5, 0x8E, 0x1A, 0x6F, 0x99, 0xD1, 0xD8, 0x31, 0xB4, 0xFE, 0xDC, 0xF8, 0xDD, 0x3D, 0x9C, 0xE1, 0xAA, 0x56, 0x44, 0x84, 0x3E, 0x97, 0x6B, 0x40, 0xF7, 0x6E, 0xE5, 0xB7, 0xDC, 0xCD, 0xD8};
-
+unsigned char TestValue2[] = "Hello v2";
 
 int main() {
     unsigned char* rootPtr = (unsigned char*)malloc(8);
@@ -194,8 +214,15 @@ int main() {
     memcpy(rootPtr, &root, 8);
 
     set(rootPtr, TestKey, TestValue);
-    set(rootPtr, TestKey2, TestValue);
+    set(rootPtr, TestKey2, TestValue2);
 
-    printTree((unsigned char*)(getPointer(rootPtr, 0)), 0);
+    //printTree((unsigned char*)(getPointer(rootPtr, 0)), 0);
+
+    unsigned char *result1 = get(rootPtr, TestKey);
+    unsigned char *result2 = get(rootPtr, TestKey2);
+
+    logChar(result1, 8, "Result 1");
+
+    logChar(result2, 8, "Result 2");
     return 0;
 }
