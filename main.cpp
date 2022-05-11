@@ -35,8 +35,6 @@ unsigned long long getPointer(unsigned char *array, int offset) {
     return result;
 }
 
-unsigned char invalidPtr[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
 void get(unsigned char *array, unsigned char *key) {
     unsigned char *branch = (unsigned char*)(getPointer(array, 0));
     unsigned int level = 0;
