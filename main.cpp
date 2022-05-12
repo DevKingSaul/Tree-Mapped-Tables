@@ -126,6 +126,7 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
             int newPtr = getBranchSize(branchSize);
             branch = (unsigned char *)realloc(branch, newPtr + 9);
             branch[0] = branchSize + 1;
+            memcpy(parent + parentPtr, &branch, 8);
 
             branch[newPtr] = key[level];
             if (level == 31) {
@@ -149,7 +150,6 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
                 branchSize = branch[0];
             }
 
-            memcpy(parent + parentPtr, &branch, 8);
             printf("End (End of Branch)\n");
             continue;
         }
