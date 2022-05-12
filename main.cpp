@@ -155,41 +155,41 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
         }
         int ptrOffset = 1 + (offset * 9);
         if (branch[ptrOffset] == key[level]) {
-            unsigned long long ptr = getPointer(branch, ptrOffset + 1);
-            if (ptr == 0) {
-                branch[ptrOffset] = key[level];
-                if (level == 31) {
-                    memcpy(branch + ptrOffset + 1, &value, 8);
-                    break;
+            if (level == 31) {
+                memcpy(branch + ptrOffset + 1, &value, 8);
+                break;
+            } else {
+                unsigned long long ptr = getPointer(branch, ptrOffset + 1);
+                if (ptr == 0) {
+                    branch[ptrOffset] = key[level];
+                        unsigned char* sub = (unsigned char*)malloc(9);
+                    
+                        for (int i = 0; i < 9; i++) {
+                            sub[i] = 0;
+                        }
+                        sub[1] = key[level + 1];
+
+                        memcpy(branch + ptrOffset + 1, &sub, 8);
+
+                        level++;
+                        parent = branch;
+                        parentPtr = ptrOffset + 1;
+                        branch = sub;
+                        offset = 0;
+                        branchSize = branch[0];
+
+                    printf("End (Pointer Invalid)\n");
+                    continue;
                 } else {
-                    unsigned char* sub = (unsigned char*)malloc(9);
-                
-                    for (int i = 0; i < 9; i++) {
-                        sub[i] = 0;
-                    }
-                    sub[1] = key[level + 1];
-
-                    memcpy(branch + ptrOffset + 1, &sub, 8);
-
+                    printf("Found at Level %u\n", level);
                     level++;
                     parent = branch;
                     parentPtr = ptrOffset + 1;
-                    branch = sub;
+                    branch = (unsigned char*)(ptr);
                     offset = 0;
                     branchSize = branch[0];
+                    printf("New Branch Size: %u\n", branchSize);
                 }
-
-                printf("End (Pointer Invalid)\n");
-                continue;
-            } else {
-                printf("Found at Level %u\n", level);
-                level++;
-                parent = branch;
-                parentPtr = ptrOffset + 1;
-                branch = (unsigned char*)(ptr);
-                offset = 0;
-                branchSize = branch[0];
-                printf("New Branch Size: %u\n", branchSize);
             }
         } else {
             offset += 1;
