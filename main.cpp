@@ -20,11 +20,14 @@ void log(unsigned char *msg, int len, const char *label) {
 }
 
 void logChar(unsigned char *msg, int len, const char *label) {
-
   printf("%s: ", label);
 
-  for(int i = 0; i < len; i++) {
-    printf("%c", msg[i]);
+  if (msg == NULL) {
+      printf("NULL");
+  } else {
+    for(int i = 0; i < len; i++) {
+        printf("%c", msg[i]);
+    }
   }
   
   printf("\n");
