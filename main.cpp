@@ -216,8 +216,69 @@ unsigned char TestValue[] = "Hello v1";
 unsigned char TestKey2[] = {0x8F, 0xE5, 0x8E, 0x1A, 0x6F, 0x99, 0xD1, 0xD8, 0x31, 0xB4, 0xFE, 0xDC, 0xF8, 0xDD, 0x3D, 0x9C, 0xE1, 0xAA, 0x56, 0x44, 0x84, 0x3E, 0x97, 0x6B, 0x40, 0xF7, 0x6E, 0xE5, 0xB7, 0xDC, 0xCD, 0xD8};
 unsigned char TestValue2[] = "Hello v2";
 
+
+#include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+unsigned char *genrandom(int length) {
+  unsigned char *bytes = (unsigned char *)malloc(length);
+  int fd = open("/dev/urandom", O_RDONLY);
+  read(fd, bytes, length);
+  close(fd);
+  return bytes;
+}
+
 int main() {
+    // Init Tree
     unsigned char* rootPtr = (unsigned char*)malloc(ptrSize);
+    unsigned char* root = (unsigned char*)malloc(fastTable_defaultSize);
+    for (int i = 0; i < fastTable_defaultSize; i++) {
+        root[i] = 0;
+    }
+    
+    memcpy(rootPtr, &root, ptrSize);
+
+    // Start Test
+
+    clock_t start;
+    clock_t end;
+
+    int i;
+
+    unsigned char **TestKeys = (unsigned char**)malloc(sizeof(unsigned char*) * 10000);
+    for (i = 0; i < 10000; i++) {
+        unsigned char *Key = genrandom(32);
+        TestKeys[i] = Key;
+    }
+
+    start = clock();
+
+    printf("testing Set performance: ");
+
+    for (i = 0; i < 10000; i++) {
+        set(rootPtr, TestKeys[i], TestValue);
+    }
+    
+    end = clock();
+    printf("%fus per Set\n", ((double) ((end - start) * 1000)) / CLOCKS_PER_SEC / i * 1000);
+
+    start = clock();
+
+    printf("testing Get performance: ");
+
+    for (i = 0; i < 10000; i++) {
+        unsigned char *value = get(rootPtr, TestKeys[i]);
+        if (value == NULL) {
+            printf("Error getting Value\n");
+            break;
+        }
+    }
+    
+    end = clock();
+    printf("%fus per Get\n", ((double) ((end - start) * 1000)) / CLOCKS_PER_SEC / i * 1000);
+
+    /*unsigned char* rootPtr = (unsigned char*)malloc(ptrSize);
     unsigned char* root = (unsigned char*)malloc(fastTable_defaultSize);
     for (int i = 0; i < fastTable_defaultSize; i++) {
         root[i] = 0;
@@ -235,6 +296,6 @@ int main() {
 
     logChar(result1, 8, "Result 1");
 
-    logChar(result2, 8, "Result 2");
+    logChar(result2, 8, "Result 2");*/
     return 0;
 }
