@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+bool debug = false;
+
 int ptrSize = sizeof(uintptr_t);
 int fastTable_elementSize = 1 + ptrSize;
 int fastTable_defaultSize = 1 + fastTable_elementSize;
@@ -47,7 +49,9 @@ unsigned char *get(unsigned char *array, unsigned char *key) {
 
     for (;;) {
         if (offset > branchSize) {
-            printf("End (End of Branch)\n");
+            if (debug) {
+                printf("End (End of Branch)\n");
+            }
             return NULL;
             break;
         }
@@ -55,14 +59,20 @@ unsigned char *get(unsigned char *array, unsigned char *key) {
         if (branch[ptrOffset] == key[level]) {
             unsigned long long ptr = getPointer(branch, ptrOffset + 1);
             if (ptr == 0) {
-                printf("End (Pointer Invalid)\n");
+                if (debug) {
+                    printf("End (Pointer Invalid)\n");
+                }
                 return NULL;
                 break;
             } else {
-                printf("Found at Level %u\n", level);
+                if (debug) {
+                    printf("Found at Level %u\n", level);
+                }
 
                 if (level == 31) {
-                    printf("Found Value: %u\n", offset);
+                    if (debug) {
+                        printf("Found Value: %u\n", offset);
+                    }
                     return (unsigned char*)(ptr);
                     break;
                 } else {
@@ -70,7 +80,9 @@ unsigned char *get(unsigned char *array, unsigned char *key) {
                     branch = (unsigned char*)(ptr);
                     offset = 0;
                     branchSize = branch[0];
-                    printf("New Branch Size: %u\n", branchSize);
+                    if (debug) {
+                        printf("New Branch Size: %u\n", branchSize);
+                    }
                 }
             }
         } else {
@@ -143,7 +155,9 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
                 branchSize = branch[0];
             }
 
-            printf("End (End of Branch)\n");
+            if (debug) {
+                printf("End (End of Branch)\n");
+            }
             continue;
         }
         int ptrOffset = 1 + (offset * fastTable_elementSize);
@@ -155,33 +169,39 @@ void set(unsigned char *array, unsigned char *key, unsigned char* value) {
                 unsigned long long ptr = getPointer(branch, ptrOffset + 1);
                 if (ptr == 0) {
                     branch[ptrOffset] = key[level];
-                        unsigned char* sub = (unsigned char*)malloc(fastTable_defaultSize);
+                    unsigned char* sub = (unsigned char*)malloc(fastTable_defaultSize);
                     
-                        for (int i = 0; i < fastTable_defaultSize; i++) {
-                            sub[i] = 0;
-                        }
-                        sub[1] = key[level + 1];
+                    for (int i = 0; i < fastTable_defaultSize; i++) {
+                        sub[i] = 0;
+                    }
+                    sub[1] = key[level + 1];
 
-                        memcpy(branch + ptrOffset + 1, &sub, ptrSize);
+                    memcpy(branch + ptrOffset + 1, &sub, ptrSize);
 
-                        level++;
-                        parent = branch;
-                        parentPtr = ptrOffset + 1;
-                        branch = sub;
-                        offset = 0;
-                        branchSize = branch[0];
+                    level++;
+                    parent = branch;
+                    parentPtr = ptrOffset + 1;
+                    branch = sub;
+                    offset = 0;
+                    branchSize = branch[0];
 
-                    printf("End (Pointer Invalid)\n");
+                    if (debug) {
+                        printf("End (Pointer Invalid)\n");
+                    }
                     continue;
                 } else {
-                    printf("Found at Level %u\n", level);
+                    if (debug) {
+                        printf("Found at Level %u\n", level);
+                    }
                     level++;
                     parent = branch;
                     parentPtr = ptrOffset + 1;
                     branch = (unsigned char*)(ptr);
                     offset = 0;
                     branchSize = branch[0];
-                    printf("New Branch Size: %u\n", branchSize);
+                    if (debug) {
+                        printf("New Branch Size: %u\n", branchSize);
+                    }
                 }
             }
         } else {
