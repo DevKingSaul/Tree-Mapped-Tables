@@ -10,12 +10,15 @@ int ptrSize = sizeof(uintptr_t);
 int fastTable_elementSize = 1 + ptrSize;
 int fastTable_defaultSize = 1 + fastTable_elementSize;
 
+int orderedFastTable_elementSize = ptrSize;
+int orderedFastTable_defaultSize = 32 + ptrSize;
+
 void log(unsigned char *msg, int len, const char *label) {
 
   printf("%s:", label);
 
   for(int i = 0; i < len; i++) {
-    printf(" %02x", msg[i]);
+    printf(" %02hhX", msg[i]);
   }
   
   printf("\n");
@@ -39,6 +42,84 @@ uintptr_t getPointer(unsigned char *array, int offset) {
     uintptr_t pointer;
     memcpy(&pointer, array + offset, ptrSize);
     return pointer;
+}
+
+unsigned short countBitsLTR(unsigned char byte, int len, bool isOffset) {
+    unsigned short count = 0;
+    unsigned short leftoverCount = 0;
+
+    for (unsigned char i = 0; i < len; i++) {
+        if ((byte & (128 >> i)) != 0) {
+            count++;
+        }
+    }
+
+    if (isOffset) {
+        for (unsigned char i = len + 1; i < 8; i++) {
+            if ((byte & (128 >> i)) != 0) {
+                leftoverCount++;
+            }
+        }
+    }
+
+    return (leftoverCount << 8) | count;
+}
+
+unsigned short getOffset(unsigned char byte, unsigned char *list, bool getRemainder) {
+    unsigned char byteOffset = byte >> 3; // Optimized way to do (byte / 8).
+    unsigned char bitOffset = byte & 7; // Optimized way to do (byte % 8).
+
+    unsigned short count = 0;
+    
+    for (int i = 0; i < byteOffset; i++) {
+        count += countBitsLTR(list[i], 8, getRemainder);
+    }
+
+    count += countBitsLTR(list[byteOffset], bitOffset, getRemainder);
+
+    if (getRemainder) {
+        for (int i = byteOffset + 1; i < 32; i++) {
+            count += (countBitsLTR(list[i], 8, false) << 8);
+        }
+    }
+
+    return count;
+}
+
+bool checkSet(unsigned char byte, unsigned char *list) {
+    unsigned char byteOffset = byte >> 3; // Optimized way to do (byte / 8).
+    unsigned char bitOffset = byte & 7; // Optimized way to do (byte % 8).
+
+    return (list[byteOffset] & (128 >> bitOffset)) != 0;
+}
+
+void setListBit(unsigned char byte, unsigned char *list) {
+    unsigned char byteOffset = byte >> 3; // Optimized way to do (byte / 8).
+    unsigned char bitOffset = byte & 7; // Optimized way to do (byte % 8).
+
+    list[byteOffset] |= (128 >> bitOffset);
+
+    return;
+}
+
+unsigned char *getOrdered(unsigned char *array, unsigned char *key, int keyLen) {
+    unsigned char *branch = (unsigned char*)(getPointer(array, 0));
+    unsigned int level = 0;
+    unsigned int branchSize = branch[0];
+
+     for (;;) {
+        bool isSet = checkSet(key[level], branch);
+
+        printf("Is Set: ");
+        if (isSet) {
+            printf("true\n");
+        } else {
+            printf("false\n");
+        }
+        break;
+     }
+
+    return NULL;
 }
 
 unsigned char *get(unsigned char *array, unsigned char *key) {
@@ -95,6 +176,10 @@ int getBranchSize(int size) {
     return 1 + fastTable_elementSize + (size * fastTable_elementSize);
 }
 
+int getOrderedBranchSize(int size) {
+    return orderedFastTable_defaultSize + (size * orderedFastTable_elementSize);
+}
+
 void printSpace(int repeat) {
     for (int iA = 0; iA < repeat; iA++) {
         printf(" ");
@@ -116,6 +201,89 @@ void printTree(unsigned char *branch, int repeat) {
             printTree((unsigned char*)(ptr), repeat+1);
         }
     }
+}
+
+void printTreeOrdered(unsigned char *branch, int repeat) {
+    unsigned short offset = getOffset(0, branch, true);
+    int branchSize = (offset >> 8);
+
+    printSpace(repeat);
+    printf("Branch Size: %u\n", branchSize);
+    printSpace(repeat);
+    log(branch + 32, 8, "Value Pointer");
+    
+    for (int i = 0; i < branchSize; i++) {
+        printSpace(repeat);
+        int offset = orderedFastTable_defaultSize + (i * orderedFastTable_elementSize);
+        unsigned long long ptr = getPointer(branch, offset);
+        log(branch + offset, orderedFastTable_elementSize, "Branch");
+        if (ptr != 0 && repeat < 31) {
+            printTreeOrdered((unsigned char*)(ptr), repeat+1);
+        }
+    }
+}
+
+void setOrdered(unsigned char *array, unsigned char *key, unsigned int keyLen, unsigned char* value) {
+    unsigned int parentPtr = 0;
+    unsigned char *parent = array;
+    unsigned char *branch = (unsigned char*)(getPointer(array, 0));
+    unsigned int level = 0;
+
+    unsigned int targetLevel = keyLen - 1;
+
+    for (;;) {
+        if (level == targetLevel) {
+            memcpy(branch + 32, &value, ptrSize);
+            break;
+        } else {
+            bool isSet = checkSet(key[level], branch);
+
+            printf("Is Set: ");
+            if (isSet) {
+                printf("true\n");
+                unsigned short offset = getOffset(key[level], branch, false);
+
+                int ptrOffset = orderedFastTable_defaultSize + ((offset & 0xff) * 8);
+
+                unsigned long long ptr = getPointer(branch, ptrOffset);
+
+                if (debug) {
+                    printf("Found at Level %u\n", level);
+                }
+                level++;
+                parent = branch;
+                parentPtr = ptrOffset;
+                branch = (unsigned char*)(ptr);
+            } else {
+                unsigned short offset = getOffset(key[level], branch, true);
+
+                int ptrOffset = orderedFastTable_defaultSize + ((offset & 0xff) * 8);
+
+                int remainderSize = (offset >> 8) * 8;
+
+                memmove (branch + ptrOffset + 8, branch + ptrOffset, remainderSize);
+
+                setListBit(key[level], branch);
+
+                unsigned char* sub = (unsigned char*)malloc(orderedFastTable_defaultSize);
+            
+                for (int i = 0; i < orderedFastTable_defaultSize; i++) {
+                    sub[i] = 0;
+                }
+
+                memcpy(branch + ptrOffset, &sub, ptrSize);
+
+                level++;
+                parent = branch;
+                parentPtr = ptrOffset;
+                branch = sub;
+                printf("false\n");
+            }
+        }
+        
+     }
+
+    return;
 }
 
 void set(unsigned char *array, unsigned char *key, unsigned char* value) {
@@ -230,7 +398,7 @@ unsigned char *genrandom(int length) {
 }
 
 int main() {
-    // Init Tree
+    /*// Init Tree
     unsigned char* rootPtr = (unsigned char*)malloc(ptrSize);
     unsigned char* root = (unsigned char*)malloc(fastTable_defaultSize);
     for (int i = 0; i < fastTable_defaultSize; i++) {
@@ -276,26 +444,27 @@ int main() {
     }
     
     end = clock();
-    printf("%fus per Get\n", ((double) ((end - start) * 1000)) / CLOCKS_PER_SEC / i * 1000);
+    printf("%fus per Get\n", ((double) ((end - start) * 1000)) / CLOCKS_PER_SEC / i * 1000);*/
 
-    /*unsigned char* rootPtr = (unsigned char*)malloc(ptrSize);
-    unsigned char* root = (unsigned char*)malloc(fastTable_defaultSize);
-    for (int i = 0; i < fastTable_defaultSize; i++) {
+    unsigned char* rootPtr = (unsigned char*)malloc(ptrSize);
+    unsigned char* root = (unsigned char*)malloc(orderedFastTable_defaultSize);
+    for (int i = 0; i < orderedFastTable_defaultSize; i++) {
         root[i] = 0;
     }
     
     memcpy(rootPtr, &root, ptrSize);
 
-    set(rootPtr, TestKey, TestValue);
-    set(rootPtr, TestKey2, TestValue2);
+    setOrdered(rootPtr, TestKey, 2, TestValue);
+    printTreeOrdered((unsigned char*)(getPointer(rootPtr, 0)), 0);
+    //set(rootPtr, TestKey2, TestValue2);
 
     //printTree((unsigned char*)(getPointer(rootPtr, 0)), 0);
 
-    unsigned char *result1 = get(rootPtr, TestKey);
-    unsigned char *result2 = get(rootPtr, TestKey2);
+    //unsigned char *result1 = getOrdered(rootPtr, TestKey, 1);
+    //unsigned char *result2 = get(rootPtr, TestKey2);
 
-    logChar(result1, 8, "Result 1");
+    //logChar(result1, 8, "Result 1");
 
-    logChar(result2, 8, "Result 2");*/
+    //logChar(result2, 8, "Result 2");
     return 0;
 }
