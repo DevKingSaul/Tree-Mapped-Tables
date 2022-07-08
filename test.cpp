@@ -1,5 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
+
+unsigned char bitCountMap[256] = { 0xaf, 0xfa };
+
+void setupBitCountMap() {
+    if (!bitCountMap[0] == 0xaf) return; // Check if needs to calculate.
+    if (!bitCountMap[1] == 0xfa) return; // Check if needs to calculate.
+
+    for (int e = 0; e < 256; e++) {
+        unsigned char count = 0;
+
+        for (unsigned char i = 0; i < 8; i++) {
+            if ((e & (128 >> i)) != 0) {
+                count++;
+            }
+        }
+
+        bitCountMap[e] = count;
+    }
+}
+
 unsigned short countBitsLTR(unsigned char byte, int len, bool isOffset) {
     unsigned short count = 0;
     unsigned short leftoverCount = 0;
@@ -34,6 +54,30 @@ unsigned char countBitsRTL(unsigned char byte, int len) {
 }
 
 unsigned short getOffset(unsigned char byte, unsigned char *list, bool getRemainder) {
+    setupBitCountMap();
+    unsigned char byteOffset = byte >> 3; // Optimized way to do (byte / 8).
+    unsigned char bitOffset = byte & 7; // Optimized way to do (byte % 8).
+
+    unsigned short count = 0;
+    
+    for (int i = 0; i < byteOffset; i++) {
+        //count += countBitsLTR(list[i], 8, getRemainder);
+        count += bitCountMap[list[i]];
+    }
+
+    count += countBitsLTR(list[byteOffset], bitOffset, getRemainder);
+
+    if (getRemainder) {
+        for (int i = byteOffset + 1; i < 32; i++) {
+            //count += (countBitsLTR(list[i], 8, false) << 8);
+            count += (bitCountMap[list[i]] << 8);
+        }
+    }
+
+    return count;
+}
+
+unsigned short getOffset_old(unsigned char byte, unsigned char *list, bool getRemainder) {
     unsigned char byteOffset = byte >> 3;
     unsigned char bitOffset = byte & 7;
 
